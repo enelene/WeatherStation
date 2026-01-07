@@ -21,7 +21,7 @@ class WeatherStation(Subject):
         >>> display = WeatherDisplay()
         >>> station.register_observer(display)
         >>> station.set_measurements(25.0, 60.0, 15.0)
-        WeatherDisplay: Showing Temperature = 25.0°C, Humidity = 60.0%, Wind Speed = 15.0 km/h
+        WeatherDisplay: Showing Temperature = 25°C, Humidity = 60%, Wind Speed = 15 km/h
     """
 
     def __init__(self) -> None:
@@ -74,14 +74,45 @@ class WeatherStation(Subject):
         Update weather measurements and notify all observers.
 
         Args:
-            temperature: Temperature in Celsius
-            humidity: Humidity as a percentage (0-100)
-            wind_speed: Wind speed in km/h
+            temperature: Temperature in Celsius (must be between -100 and 100)
+            humidity: Humidity as a percentage (must be between 0 and 100)
+            wind_speed: Wind speed in km/h (must be non-negative)
+
+        Raises:
+            ValueError: If any measurement is outside valid range.
 
         Note:
             This method automatically triggers notification to all observers.
         """
+        self._validate_measurements(temperature, humidity, wind_speed)
         self._temperature = temperature
         self._humidity = humidity
         self._wind_speed = wind_speed
         self.notify_observers()
+
+    def _validate_measurements(
+        self, temperature: float, humidity: float, wind_speed: float
+    ) -> None:
+        """
+        Validate weather measurements are within acceptable ranges.
+
+        Args:
+            temperature: Temperature in Celsius
+            humidity: Humidity percentage
+            wind_speed: Wind speed in km/h
+
+        Raises:
+            ValueError: If any measurement is invalid.
+        """
+        if not (-100 <= temperature <= 100):
+            raise ValueError(
+                f"Temperature must be between -100 and 100°C, got {temperature}"
+            )
+        if not (0 <= humidity <= 100):
+            raise ValueError(
+                f"Humidity must be between 0 and 100%, got {humidity}"
+            )
+        if wind_speed < 0:
+            raise ValueError(
+                f"Wind speed must be non-negative, got {wind_speed}"
+            )

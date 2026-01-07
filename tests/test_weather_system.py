@@ -9,6 +9,7 @@ from weather_monitoring.observers import (
     WindSpeedAlert,
     HumidityAlert,
 )
+from weather_monitoring.factory import ObserverFactory
 
 
 class TestWeatherStation(unittest.TestCase):
@@ -91,6 +92,43 @@ class TestWeatherStation(unittest.TestCase):
         self.assertEqual(obs2.data, (30.0, 70.0, 15.0))
         self.assertEqual(obs3.data, (30.0, 70.0, 15.0))
 
+    def test_invalid_temperature_too_low(self) -> None:
+        """Test that temperature below -100°C raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            self.station.set_measurements(-101.0, 50.0, 10.0)
+        self.assertIn("Temperature", str(context.exception))
+
+    def test_invalid_temperature_too_high(self) -> None:
+        """Test that temperature above 100°C raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            self.station.set_measurements(101.0, 50.0, 10.0)
+        self.assertIn("Temperature", str(context.exception))
+
+    def test_invalid_humidity_too_low(self) -> None:
+        """Test that negative humidity raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            self.station.set_measurements(25.0, -1.0, 10.0)
+        self.assertIn("Humidity", str(context.exception))
+
+    def test_invalid_humidity_too_high(self) -> None:
+        """Test that humidity above 100% raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            self.station.set_measurements(25.0, 101.0, 10.0)
+        self.assertIn("Humidity", str(context.exception))
+
+    def test_invalid_wind_speed_negative(self) -> None:
+        """Test that negative wind speed raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            self.station.set_measurements(25.0, 50.0, -1.0)
+        self.assertIn("Wind speed", str(context.exception))
+
+    def test_valid_boundary_values(self) -> None:
+        """Test that boundary values are accepted."""
+        # Should not raise any exceptions
+        self.station.set_measurements(-100.0, 0.0, 0.0)
+        self.station.set_measurements(100.0, 100.0, 0.0)
+        self.station.set_measurements(0.0, 50.0, 200.0)
+
 
 class TestWeatherDisplay(unittest.TestCase):
     def test_display_output_format(self) -> None:
@@ -112,6 +150,22 @@ class TestWeatherDisplay(unittest.TestCase):
         # Should NOT contain decimal points
         self.assertNotIn("25.5", output)
         self.assertNotIn("65.3", output)
+
+    def test_display_zero_values(self) -> None:
+        """Test display with zero values."""
+        display = WeatherDisplay()
+
+        captured_output = StringIO()
+        sys.stdout = captured_output
+
+        display.update(0.0, 0.0, 0.0)
+
+        sys.stdout = sys.__stdout__
+        output = captured_output.getvalue()
+
+        self.assertIn("0°C", output)
+        self.assertIn("0%", output)
+        self.assertIn("0 km/h", output)
 
 
 class TestTemperatureAlert(unittest.TestCase):
@@ -151,6 +205,20 @@ class TestTemperatureAlert(unittest.TestCase):
         self.assertGreaterEqual(alert._threshold, 25.0)
         self.assertLessEqual(alert._threshold, 40.0)
 
+    def test_extreme_temperature_values(self) -> None:
+        """Test with extreme temperature values."""
+        alert = TemperatureAlert(threshold=30.0)
+
+        captured_output = StringIO()
+        sys.stdout = captured_output
+
+        alert.update(100.0, 50, 10)
+
+        sys.stdout = sys.__stdout__
+        output = captured_output.getvalue()
+
+        self.assertIn("100°C", output)
+
 
 class TestHumidityAlert(unittest.TestCase):
     def test_threshold_trigger(self) -> None:
@@ -181,7 +249,6 @@ class TestHumidityAlert(unittest.TestCase):
         sys.stdout = sys.__stdout__
         output = captured_output.getvalue()
 
-        # Should trigger at exactly 85%
         self.assertIn("Alert! Humidity exceeded 85%: 85%", output)
 
     def test_default_random_threshold(self) -> None:
@@ -189,6 +256,20 @@ class TestHumidityAlert(unittest.TestCase):
         alert = HumidityAlert()
         self.assertGreaterEqual(alert._threshold, 60.0)
         self.assertLessEqual(alert._threshold, 90.0)
+
+    def test_extreme_humidity_values(self) -> None:
+        """Test with maximum humidity value."""
+        alert = HumidityAlert(threshold=85.0)
+
+        captured_output = StringIO()
+        sys.stdout = captured_output
+
+        alert.update(25, 100.0, 10)
+
+        sys.stdout = sys.__stdout__
+        output = captured_output.getvalue()
+
+        self.assertIn("100%", output)
 
 
 class TestWindSpeedAlert(unittest.TestCase):
@@ -257,6 +338,66 @@ class TestWindSpeedAlert(unittest.TestCase):
         self.assertIn("15 km/h → 20 km/h", output)
         self.assertIn("20 km/h → 25 km/h", output)
 
+    def test_zero_wind_speed(self) -> None:
+        """Test with zero wind speed values."""
+        alert = WindSpeedAlert()
+
+        captured_output = StringIO()
+        sys.stdout = captured_output
+
+        alert.update(20, 50, 0)
+        alert.update(20, 50, 0)
+
+        sys.stdout = sys.__stdout__
+        output = captured_output.getvalue()
+
+        self.assertIn("No alert", output)
+
+
+class TestObserverFactory(unittest.TestCase):
+    def test_create_display(self) -> None:
+        """Test factory creates WeatherDisplay."""
+        observer = ObserverFactory.create_display()
+        self.assertIsInstance(observer, WeatherDisplay)
+
+    def test_create_temperature_alert_with_threshold(self) -> None:
+        """Test factory creates TemperatureAlert with specific threshold."""
+        observer = ObserverFactory.create_temperature_alert(threshold=30.0)
+        self.assertIsInstance(observer, TemperatureAlert)
+        self.assertEqual(observer._threshold, 30.0)
+
+    def test_create_temperature_alert_random_threshold(self) -> None:
+        """Test factory creates TemperatureAlert with random threshold."""
+        observer = ObserverFactory.create_temperature_alert()
+        self.assertIsInstance(observer, TemperatureAlert)
+        self.assertGreaterEqual(observer._threshold, 25.0)
+        self.assertLessEqual(observer._threshold, 40.0)
+
+    def test_create_humidity_alert(self) -> None:
+        """Test factory creates HumidityAlert."""
+        observer = ObserverFactory.create_humidity_alert(threshold=75.0)
+        self.assertIsInstance(observer, HumidityAlert)
+        self.assertEqual(observer._threshold, 75.0)
+
+    def test_create_wind_speed_alert(self) -> None:
+        """Test factory creates WindSpeedAlert."""
+        observer = ObserverFactory.create_wind_speed_alert()
+        self.assertIsInstance(observer, WindSpeedAlert)
+
+    def test_create_all_alerts(self) -> None:
+        """Test factory creates all alert types."""
+        alerts = ObserverFactory.create_all_alerts()
+        self.assertEqual(len(alerts), 3)
+        self.assertIsInstance(alerts[0], TemperatureAlert)
+        self.assertIsInstance(alerts[1], WindSpeedAlert)
+        self.assertIsInstance(alerts[2], HumidityAlert)
+
+    def test_create_default_observers(self) -> None:
+        """Test factory creates default observer set."""
+        observers = ObserverFactory.create_default_observers()
+        self.assertEqual(len(observers), 4)
+        self.assertIsInstance(observers[0], WeatherDisplay)
+
 
 class TestIntegration(unittest.TestCase):
     def test_full_simulation_scenario(self) -> None:
@@ -314,7 +455,29 @@ class TestIntegration(unittest.TestCase):
         station.remove_observer(obs)
 
         station.set_measurements(30, 60, 15)
-        self.assertEqual(obs.count, 2)  # Should not increase
+        self.assertEqual(obs.count, 2)
+
+    def test_factory_with_station(self) -> None:
+        """Test using factory to create and register observers."""
+        station = WeatherStation()
+
+        # Use factory to create observers
+        display = ObserverFactory.create_display()
+        temp_alert = ObserverFactory.create_temperature_alert(threshold=30.0)
+
+        station.register_observer(display)
+        station.register_observer(temp_alert)
+
+        captured_output = StringIO()
+        sys.stdout = captured_output
+
+        station.set_measurements(35.0, 60.0, 15.0)
+
+        sys.stdout = sys.__stdout__
+        output = captured_output.getvalue()
+
+        self.assertIn("WeatherDisplay", output)
+        self.assertIn("TemperatureAlert", output)
 
 
 if __name__ == "__main__":

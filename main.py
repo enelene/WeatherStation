@@ -1,25 +1,26 @@
 import random
 import time
 from weather_monitoring.station import WeatherStation
-from weather_monitoring.observers import (
-    WeatherDisplay,
-    TemperatureAlert,
-    WindSpeedAlert,
-    HumidityAlert,
-)
+from weather_monitoring.factory import ObserverFactory
 
 
 def run_simulation() -> None:
+    """
+    Run the weather monitoring simulation.
+    
+    This simulation demonstrates the Observer pattern by creating a weather
+    station and dynamically adding/removing observers over 20 weeks.
+    """
     station = WeatherStation()
 
-    # Initial Observer
-    display = WeatherDisplay()
+    # Use factory to create observers
+    display = ObserverFactory.create_display()
     station.register_observer(display)
 
     # Pre-create observers with specific thresholds to match example
-    temp_alert = TemperatureAlert(threshold=32.0)
-    wind_alert = WindSpeedAlert()
-    humidity_alert = HumidityAlert(threshold=85.0)
+    temp_alert = ObserverFactory.create_temperature_alert(threshold=32.0)
+    wind_alert = ObserverFactory.create_wind_speed_alert()
+    humidity_alert = ObserverFactory.create_humidity_alert(threshold=85.0)
 
     # Simulation settings
     weeks = 20
