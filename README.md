@@ -16,7 +16,9 @@ Factory Pattern: Centralized observer creation and configuration
 Type Safety: Full type hints with mypy support
 Comprehensive Testing: 30+ test cases covering all functionality
 Project Structure
+
 weather_monitoring_system/
+'''
 ├── weather_monitoring/
 │   ├── __init__.py
 │   ├── interfaces.py      # Observer and Subject protocols
@@ -29,6 +31,7 @@ weather_monitoring_system/
 ├── README.md
 ├── .gitignore
 └── pyproject.toml         # Project configuration
+'''
 Requirements
 Python 3.13+
 No external dependencies required for core functionality
